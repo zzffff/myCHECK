@@ -1,0 +1,105 @@
+---
+title: "hw3"
+author: "zzf"
+date: "2018年10月29日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+Auto.da<-read.csv("D:/data_mining/data/Auto.csv",na.string="?",header = T) #若没有将缺失值变为NA，则？会无法识别为数字，后面会有数值变量变为不是数值变量的额问题
+
+### 1.
+Auto.da<-na.omit(Auto.da) #将有缺失值的观测删去，得到新的Auto.da
+mpg<-Auto.da[ ,1]
+Me.mpg<-median(mpg)
+n<-nrow(Auto.da)  #行数；length表示变量的个数
+mpg01<-rep(0,n)  #一个向量
+mpg01[mpg>=Me.mpg]<-1 #条件来决定位置上的值
+mpg01<-as.factor(mpg01) #变为因子
+new.auto<-cbind(mpg01,Auto.da)
+summary(new.auto)
+
+###2.
+cor(new.auto[,2:9])#NA是什么情况？,没有删去NA，导致correlation无法算出
+pairs(new.auto[1:5])
+attach(new.auto)
+par(mfrow=c(2,2))
+plot(mpg01,horsepower,ylab="horsepower") ##plot(x,y,ylab=" "),若x是binary 定性变量，则直接变成boxplot
+plot(mpg01,weight,ylab="weight")
+plot(mpg01,cylinders,ylab="cylinder")
+plot(mpg01,displacement,ylab="displacement")
+plot(mpg01,year,ylab="year")
+plot(mpg01,origin,ylab="origin")
+plot(mpg01,acceleration,ylab="acceleration")
+#根据boxplot，可得知mpg01变量与cylinders,horsepower,weight,displacement,year,origin,acceleration都有不同程度上的关系
+```
+
+```{r}
+###3. 数据集的随机分组
+set.seed(2)
+p<-200/392
+trainingindex<-sample(1:n,p*n) #表示要从1至n(392)行中随机取200行，p表示比例200/392
+trainset<-new.auto[trainingindex,]
+testset<-new.auto[-trainingindex,]
+
+###4.
+glm.fit<-glm(mpg01~horsepower+weight+year+origin,data = trainset,family = binomial)
+summary(glm.fit)
+glm.prob<-predict(glm.fit,type="response")#得到给定x下得到mpg01等于1的可能性(l利用训练数据代入拟合出来的方程得到的拟合值，长度也是200，与训练数据相同)
+glm.pred<-rep(0,200)
+glm.pred[glm.prob>0.5]<-1
+table(trainset$mpg01,glm.pred)
+(87+101)/200
+glm.prob2<-predict(glm.fit,newdata = testset,type="response")
+glm.pred2<-rep(0,192)
+glm.pred2[glm.prob2>0.5]<-1
+table(testset$mpg01,glm.pred2)#或者mean(testset$mpg01==glm.pred2)
+(89+76)/192
+```
+所以，由confusion matrix得知logistic对训练数据预测的正确率是0.94,对测试数据的预测准确率是0.859375
+
+```{r}
+#5
+library(MASS)
+lda.fit<-lda(mpg01~horsepower+weight+year+origin,data = trainset)
+lda.fit #"没有p值，怎么看预测变量是否显著？"
+lda.pred<-predict(lda.fit,newdata = testset, type="response")
+lda.pred2<-predict(lda.fit, type="response")
+table(lda.pred$class,testset$mpg01)
+(84+84)/192
+table(lda.pred2$class,trainset$mpg01)
+(83+104)/200
+```
+由confusion matrix得知LDA方法对训练数据预测的正确率是0.935,对测试数据的预测准确率是0.875
+```{r}
+#6
+qda.fit<-qda(mpg01~horsepower+weight+year+origin,data = trainset)
+qda.fit
+qda.pred<-predict(qda.fit,type = "reponse")
+qda.pred2<-predict(qda.fit,newdata = testset,type="reponse")
+table(qda.pred$class,trainset$mpg01)
+(85+101)/200
+table(qda.pred2$class,testset$mpg01)
+mean(qda.pred2$class==testset$mpg01)
+
+```
+由confusion matrix得知QDA方法对训练数据预测的正确率是0.93,对测试数据的预测准确率是0.8645833
+```{r}
+library(class)
+train.x<-trainset[,c("horsepower","weight","year","origin")]
+test.x<-testset[,c("horsepower","weight","year","origin")]
+train.y<-trainset[,c("mpg01")]
+knn.pred<-knn(train.x,test.x,train.y,k=1)
+table(knn.pred,testset$mpg01)
+mean(knn.pred==testset$mpg01)
+knn.pred2<-knn(train.x,test.x,train.y,k=5)
+table(knn.pred2,testset$mpg01)
+mean(knn.pred2==testset$mpg01)
+```
+当k=1时，knn方法对训练数据预测的正确率是0.8541667,当k=5时，knn方法对训练数据预测的正确率是0.8697917
+
+综上，对测试数据预测准确率最高的是LDA法，最低的是logistic方法（但是只低了一个百分点）
